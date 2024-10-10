@@ -4,6 +4,63 @@ import matplotlib.pyplot as plt
 import os
 import time
 import random
+from scipy.ndimage import distance_transform_edt
+from skimage.morphology import remove_small_objects
+from skimage.segmentation import watershed, clear_border
+
+
+def remove_gaps(image_path):
+    image = cv2.imread('empty.jpg', cv2.IMREAD_GRAYSCALE)
+
+    # Check if the image is loaded correctly
+    if image is None:
+        raise ValueError("Image not loaded. Check the file path.")
+
+    # Apply binary thresholding to create a binary image (threshold value may need adjustment)
+    _, binary_image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # Compute the distance transform
+    dist_transform = distance_transform_edt(binary_image)
+
+    # Identify the room centers by finding peaks in the distance transform
+    peaks = dist_transform > (0.2 * dist_transform.max())  # Adjust multiplier if needed
+
+    # Use peaks as markers for the watershed algorithm
+    markers = cv2.connectedComponents(np.uint8(peaks))[1]
+
+    # Invert the distance transform for the watershed transform
+    inverted_dist_transform = -dist_transform
+
+    # Apply watershed segmentation
+    labels = watershed(inverted_dist_transform, markers, mask=binary_image)
+
+    # Remove components touching the border
+    cleared_labels = clear_border(labels)
+
+    # Remove small components (e.g., noise) with a size threshold (e.g., 1000)
+    min_size = 500  # Adjust this value based on your image's scale
+    final_labels = remove_small_objects(cleared_labels, min_size=min_size)
+
+    # Create a color image to draw the contours
+    contour_image = np.zeros((image.shape[0], image.shape[1], 3), dtype=np.uint8)
+
+    # Get unique labels excluding the background (0)
+    unique_labels = np.unique(final_labels)
+    unique_labels = unique_labels[unique_labels > 0]
+
+    # Generate distinct colors for each label
+    colors = np.random.randint(0, 255, size=(len(unique_labels), 3))
+
+    # Draw contours for each unique label
+    for i, label in enumerate(unique_labels):
+        # Find contours for the current label
+        contours, _ = cv2.findContours((final_labels == label).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Draw contours with the corresponding color
+        for contour in contours:
+            cv2.drawContours(contour_image, [contour], -1, colors[i].tolist(), 2)  # Draw with unique color
+
+    return contour_image
 def extract_floor_plan(image_path):
     img = cv2.imread(image_path)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -75,22 +132,29 @@ def identify_rooms(image_path):
 
 # Usage
 if __name__ == "__main__":
-    for path in os.listdir(os.path.join(os.path.join("floorplans", "raw"))):
-        image_path = os.path.join(os.path.join("floorplans", "raw"), path)
-        cropped = extract_floor_plan(image_path)
-        output_path_cropped = os.path.join(os.path.join("floorplans", "cropped"), path)
-        cv2.imwrite(output_path_cropped, cropped)
-        #cv2.imshow('Cropped Floor Plan', cropped)
-        #cv2.waitKey(0)
-        #cv2.destroyAllWindows()
-        count = 0
-        while not (os.path.exists(output_path_cropped) or count > 15):
-            count += 1
-            time.sleep(1)
-        count = 0
-        rooms = identify_rooms(output_path_cropped)
-        output_path_rooms = os.path.join(os.path.join("floorplans", "rooms"), path)
-        cv2.imwrite(output_path_rooms, rooms)
-        cv2.imshow('Room Identification', rooms)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+    image = remove_gaps("floorplans/test/empty.jpg")
+    plt.figure(figsize=(10, 10))
+    plt.imshow(image)
+    plt.title('Segmented Rooms Contours in Different Colors')
+    plt.axis('off')
+    plt.show()
+
+    # for path in os.listdir(os.path.join(os.path.join("floorplans", "raw"))):
+    #     image_path = os.path.join(os.path.join("floorplans", "raw"), path)
+    #     cropped = extract_floor_plan(image_path)
+    #     output_path_cropped = os.path.join(os.path.join("floorplans", "cropped"), path)
+    #     cv2.imwrite(output_path_cropped, cropped)
+    #     #cv2.imshow('Cropped Floor Plan', cropped)
+    #     #cv2.waitKey(0)
+    #     #cv2.destroyAllWindows()
+    #     count = 0
+    #     while not (os.path.exists(output_path_cropped) or count > 15):
+    #         count += 1
+    #         time.sleep(1)
+    #     count = 0
+    #     rooms = identify_rooms(output_path_cropped)
+    #     output_path_rooms = os.path.join(os.path.join("floorplans", "rooms"), path)
+    #     cv2.imwrite(output_path_rooms, rooms)
+    #     cv2.imshow('Room Identification', rooms)
+    #     cv2.waitKey(0)
+    #     cv2.destroyAllWindows()
