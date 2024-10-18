@@ -12,7 +12,7 @@ import math
 
 
 def remove_gaps(image_path):
-    image = cv2.imread('empty.jpg', cv2.IMREAD_GRAYSCALE)
+    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
 
     # Check if the image is loaded correctly
     if image is None:
@@ -168,14 +168,18 @@ def midpoint(x1, y1, x2, y2):
     y_mid = int((y1 + y2)/2)
     return (x_mid, y_mid)
 
+def remove_text(path):
+    pipeline = keras_ocr.pipeline.Pipeline()
+    img_text_removed = inpaint_text(path, pipeline)
+    return img_text_removed
+
 # Usage
 if __name__ == "__main__":
-    pipeline = keras_ocr.pipeline.Pipeline()
-    img_text_removed = inpaint_text('floorplans/test/hard.jpg', pipeline)
+    img_text_removed = remove_text("floorplans/test/hard.jpg")
     plt.imshow(img_text_removed)
     cv2.imwrite('text_removed_image.jpg', cv2.cvtColor(img_text_removed, cv2.COLOR_BGR2RGB))
 
-    image = remove_gaps("floorplans/test/empty.jpg")
+    image = remove_gaps("text_removed_image.jpg")
     plt.figure(figsize=(10, 10))
     plt.imshow(image)
     plt.title('Segmented Rooms Contours in Different Colors')
