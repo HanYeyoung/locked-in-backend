@@ -1,11 +1,20 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
+import svgwrite
+import random
 import os
 import time
-import random
+
+def generate_random_color():
+    """Generates a random color in hex format."""
+    return "#{:06x}".format(random.randint(0, 0xFFFFFF))
+
 def extract_floor_plan(image_path):
+    """Extracts the main floor plan contour from the image by removing the background."""
     img = cv2.imread(image_path)
+    if img is None:
+        raise ValueError(f"Failed to load image from {image_path}")
+    
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     # Apply binary thresholding
@@ -30,67 +39,77 @@ def extract_floor_plan(image_path):
     # Crop the image to the bounding rectangle
     cropped = result[y:y + h, x:x + w]
 
-    return cropped
+    return cropped, (x, y)
 
-def generate_random_color():
-    return (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-def identify_rooms(image_path):
-    start_time = time.time()
-
+def identify_rooms_to_svg(image_path, output_svg_path):
+    """
+    Detects the rooms (contours) from the floor plan image and saves them as an SVG file.
+    Rooms are drawn as polygons and labeled with their room number.
+    """
     print(f"Loading image: {image_path}")
     img = cv2.imread(image_path)
     if img is None:
         raise ValueError(f"Failed to load image from {image_path}")
 
-    print(f"Image shape: {img.shape}")
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    print("Thresholding image")
-    _, binary = cv2.threshold(gray, 100, 255, cv2.THRESH_BINARY)  # Adjust threshold as needed
+    # Threshold image
+    _, binary = cv2.threshold(gray, 100, 255, cv2.THRESH_BINARY)
 
-    print("Finding contours")
+    # Find contours
     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    print(f"Found {len(contours)} contours")
-    min_room_area = 350  # Adjust this value based on the scale of your floor plan
+    # Filter based on a minimum room area
+    min_room_area = 350
     room_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_room_area]
-    print(f"Filtered to {len(room_contours)} room contours")
 
-    print("Drawing contours and numbering rooms")
-    result = img.copy()
+    # Create an SVG drawing
+    dwg = svgwrite.Drawing(output_svg_path, profile='tiny')
+
+    # Loop through the contours and write them as paths in the SVG
     for i, cnt in enumerate(room_contours):
-        color = generate_random_color()
-        cv2.drawContours(result, [cnt], 0, color, 2)
-        M = cv2.moments(cnt)
-        if M["m00"] != 0:
-            cX = int(M["m10"] / M["m00"])
-            cY = int(M["m01"] / M["m00"])
-            cv2.putText(result, f"{i + 1}", (cX - 20, cY),
-                        cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, 0.5, color, 2)
+        path_data = []
+        for point in cnt:
+            # Extract (x, y) and ensure they are integers
+            x, y = map(int, point[0])  # Ensuring x, y are integers
+            path_data.append((x, y))  # Append as a tuple (x, y)
 
-    end_time = time.time()
-    print(f"Total processing time: {end_time - start_time:.2f} seconds")
+        # Debug: Print the points to make sure they are valid
+        print(f"Room {i + 1} path data: {path_data}")
 
-    return result
+        # Ensure path_data contains valid coordinates before adding to SVG
+        if path_data:
+            # Create a polygon for each room
+            dwg.add(dwg.polygon(points=path_data, fill=generate_random_color(), stroke='black', stroke_width=1))
 
-# Usage
+            # Compute centroid for room number placement
+            M = cv2.moments(cnt)
+            if M["m00"] != 0:
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+                # Add text label to the SVG
+                dwg.add(dwg.text(f'Room {i + 1}', insert=(cX, cY), fill='black'))
+
+    # Save the SVG file
+    dwg.save()
+    print(f"Saved SVG to {output_svg_path}")
+
+# Main usage
 if __name__ == "__main__":
-    for path in os.listdir(os.path.join(os.path.join("floorplans", "raw"))):
-        image_path = os.path.join(os.path.join("floorplans", "raw"), path)
-        cropped = extract_floor_plan(image_path)
-        output_path_cropped = os.path.join(os.path.join("floorplans", "cropped"), path)
-        cv2.imwrite(output_path_cropped, cropped)
-        #cv2.imshow('Cropped Floor Plan', cropped)
-        #cv2.waitKey(0)
-        #cv2.destroyAllWindows()
-        count = 0
-        while not (os.path.exists(output_path_cropped) or count > 15):
-            count += 1
-            time.sleep(1)
-        count = 0
-        rooms = identify_rooms(output_path_cropped)
-        output_path_rooms = os.path.join(os.path.join("floorplans", "rooms"), path)
-        cv2.imwrite(output_path_rooms, rooms)
-        cv2.imshow('Room Identification', rooms)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+    input_folder = os.path.join("floorplans", "raw")
+    output_svg_folder = os.path.join("floorplans", "svg")
+
+    # Create output folder if not exists
+    if not os.path.exists(output_svg_folder):
+        os.makedirs(output_svg_folder)
+
+    for path in os.listdir(input_folder):
+        image_path = os.path.join(input_folder, path)
+        output_svg_path = os.path.join(output_svg_folder, path.replace(".jpg", ".svg"))
+        
+        cropped, _ = extract_floor_plan(image_path)
+        temp_cropped_path = "temp_cropped.jpg"
+        cv2.imwrite(temp_cropped_path, cropped)
+        
+        identify_rooms_to_svg(temp_cropped_path, output_svg_path)
+        os.remove(temp_cropped_path)  # Clean up the temporary cropped image
