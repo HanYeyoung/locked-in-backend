@@ -51,47 +51,7 @@ def get_building_bounds_mapbox(address, access_token):
 
 
 
-# Works
-#fetches bounding box for a given address using the 
-def get_building_bounds_osm(address):
-    url = "https://nominatim.openstreetmap.org/search"
-    params = {
-        "q": address,
-        "format": "json",
-        "limit": 1
-    }
-    
-    headers = {
-        "User-Agent": "getcoordinatesß (simcard.adis@gmail.com)"  # Replace with your app name and email
-    }
-    
-    response = requests.get(url, params=params, headers=headers)
-    
 
-    if response.status_code != 200:
-        print(f"Request failed with status code {response.status_code} - ", response.text)
-        return None
-    
-    try:
-        data = response.json()
-    except requests.JSONDecodeError as e:
-        print("Error decoding JSON:", e, " - ", response.text)
-        return None
-
-
-    if data:
-        bbox = data[0].get("boundingbox")
-        if bbox:
-            top_left = (float(bbox[1]), float(bbox[2]))  #[max_lat, min_lng]
-            bottom_right = (float(bbox[0]), float(bbox[3]))  #[min_lat, max_lng]
-            return top_left, bottom_right
-        else:
-            print("Bounding box not available!!!")
-            return None
-        
-    else:
-        print("No results found")
-        return None
 
 
 def get_place_bounds_google(place_id, api_key):
@@ -141,29 +101,70 @@ def get_building_bounds_google(address, api_key):
         print("Geocoding request failed:", geocode_data["status"])
         return None
 
-# Example usage
-api_key = "YOUR_GOOGLE_API_KEY"
-address = "800 Langdon Street, Madison, WI"
-bounds = get_building_bounds_google(address, api_key)
 
 
+# api_key = "YOUR_GOOGLE_API_KEY"
+# address = "800 Langdon Street, Madison, WI"
+# bounds = get_building_bounds_google(address, api_key)
     
+
+# Works
+#fetches bounding box for a given address using the 
+def get_building_bounds_osm(address):
+    url = "https://nominatim.openstreetmap.org/search"
+    params = {
+        "q": address,
+        "format": "json"
+    }
+    
+    headers = {
+        "User-Agent": "getcoordinates (simcard.adis@gmail.com)"  # Replace with your app name and email
+    }
+    
+    response = requests.get(url, params=params, headers=headers)
+    
+    # Check if the response is successful
+    if response.status_code != 200:
+        print(f"Request failed with status code {response.status_code}")
+        print("Response text:", response.text)
+        return None
+    
+    try:
+        data = response.json()
+    except requests.JSONDecodeError as e:
+        print("Error decoding JSON:", e)
+        print("Response text:", response.text)
+        return None
+
+    for item in data:
+        if item.get("osm_type") == "way" and item.get("class") == "building":
+            bbox = item.get("boundingbox")
+            if bbox:
+                top_left = (float(bbox[1]), float(bbox[2]))  # [max_lat, min_lng]
+                bottom_right = (float(bbox[0]), float(bbox[3]))  # [min_lat, max_lng]
+                return top_left, bottom_right
+            
+    print("No results found.")
+    return None
 
 
 address = "800 Langdon Street, Madison, WI"
 access_token = "pk.eyJ1Ijoic2ltYXJqaXQxMjMiLCJhIjoiY20xb2V1cjM2MTR5YjJpcHZwNGVxbG5jeiJ9.1ppiJSjLROk1SM71_zHm9Q"
 coordinates = get_coordinates_mapbox(address, access_token)
-if coordinates:
-    print(f"Coordinates for '{address}': {coordinates}")
+# if coordinates:
+#     print(f"Coordinates for '{address}': {coordinates}")
+
+
+bounds = get_building_bounds_osm(address)
+if bounds:
+    print(f"Top-left: {bounds[0]}, Bottom-right: {bounds[1]}")
+
+
 
 # bounds = get_building_bounds_mapbox(address, access_token)
 # if bounds:
 #     print(f"Top-left: {bounds[0]}, Bottom-right: {bounds[1]}")
     
-bounds = get_building_bounds_osm(address)
-if bounds:
-    print(f"Top-left: {bounds[0]}, Bottom-right: {bounds[1]}")
-
 
 # latitude, longitude = coordinates[0], coordinates[1]  # Replace with actual coordinates
 # data = get_building_bounds_osm(latitude, longitude , radius=1000)
