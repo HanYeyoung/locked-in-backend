@@ -300,20 +300,38 @@ def contours_to_geojson(contours, image_shape, top_left_lat, top_left_lon, degre
 # Main code
 if __name__ == "__main__":
     # Load the image and calculate contours
-    contours, image_shape = remove_gaps("cropped_floor_plan.jpg")
+    # Path to the folder containing the images
+    input_folder = "floorplans"
+    output_folder = "geojson_output"
 
-    # Calculate degrees per pixel
-    degrees_per_pixel_lat, degrees_per_pixel_lon = calculate_degrees_per_pixel(
-        image_shape, top_left_lat, top_left_lon, bottom_right_lat, bottom_right_lon
-    )
+    # Ensure output folder exists
+    os.makedirs(output_folder, exist_ok=True)
 
-    # Convert contours to GeoJSON using exact bounds
-    geojson = contours_to_geojson(
-        contours, image_shape, top_left_lat, top_left_lon, degrees_per_pixel_lat, degrees_per_pixel_lon
-    )
+    # Process all images in the folder
+    for filename in os.listdir(input_folder):
+        if filename.endswith(".jpg"):
+            image_path = os.path.join(input_folder, filename)
 
-    # Save the GeoJSON file
-    with open('floor_plan.geojson', 'w') as f:
-        json.dump(geojson, f)
+            try:
+                # Step 1: Extract contours from the image
+                contours, image_shape = remove_gaps(image_path)
 
-    print("GeoJSON file 'floor_plan.geojson' has been created with exact bounds.")
+                # Step 2: Calculate degrees per pixel
+                degrees_per_pixel_lat, degrees_per_pixel_lon = calculate_degrees_per_pixel(
+                    image_shape, top_left_lat, top_left_lon, bottom_right_lat, bottom_right_lon
+                )
+
+                # Step 3: Convert contours to GeoJSON
+                geojson = contours_to_geojson(
+                    contours, image_shape, top_left_lat, top_left_lon, degrees_per_pixel_lat, degrees_per_pixel_lon
+                )
+
+                # Step 4: Save GeoJSON file with the corresponding image name
+                output_file = os.path.join(output_folder, f"{os.path.splitext(filename)[0]}.geojson")
+                with open(output_file, 'w') as f:
+                    json.dump(geojson, f)
+
+                print(f"GeoJSON for {filename} has been created and saved as {output_file}")
+
+            except Exception as e:
+                print(f"Error processing {filename}: {e}")
