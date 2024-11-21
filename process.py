@@ -1,5 +1,4 @@
 import time
-
 from skimage import io
 import keras_ocr
 import math
@@ -150,7 +149,7 @@ def remove_gaps(image_path, peak_multiplier=0.15, min_size_ratio=0.03, search_ra
     return contour_image
 
 if __name__ == "__main__":
-    path = "MU_1.jpg"
+    path = "MU_2.jpg"
 #    image_path = os.path.join(os.path.join("floorplans", "raw"), path)
 #    cropped = extract_floor_plan(image_path)
 #    output_path_cropped = os.path.join(os.path.join("floorplans", "cropped"), path)
