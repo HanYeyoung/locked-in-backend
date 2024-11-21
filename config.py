@@ -15,9 +15,9 @@ CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY')
 CLOUDINARY_API_SECRECT = os.getenv('CLOUDINARY_API_SECRET')
 
 cloudinary_config(
-    cloud_name="drxspo9mq",
-    api_key="967515716937372",
-    api_secret="LMwMmJu00yJtIbe1REcVpE1qESY"
+    cloud_name=CLOUDINARY_CLOUD_NAME,
+    api_key=CLOUDINARY_API_KEY,
+    api_secret=CLOUDINARY_API_SECRECT
 )
 
 def validate_config():
