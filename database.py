@@ -33,7 +33,7 @@ class DatabaseHandler:
             "building_id": building_id,
             "floor_number": floor_number,
             "name": name,
-            "status": "pending",  # Initial status
+            "status": "pending",
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }
