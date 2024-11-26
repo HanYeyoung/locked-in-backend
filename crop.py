@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 
-def remove_gaps(image, peak_multiplier=0.15, min_size_ratio=0.03, search_ratio=0.05):
+def remove_gaps(image, peak_multiplier=0.15, min_size_ratio=0.03):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # Check if the image is loaded correctly
     if image is None:
@@ -27,12 +27,11 @@ def remove_gaps(image, peak_multiplier=0.15, min_size_ratio=0.03, search_ratio=0
     dist_transform = distance_transform_edt(binary_image)
 
     # Calculate thresholds and peaks
-    local_max_large = maximum_filter(dist_transform, size=75)  # Adjust size parameter as needed
-    local_max_small = maximum_filter(dist_transform, size=10)
+    local_max_large = maximum_filter(dist_transform, size = 60)  # Adjust size parameter as needed
+    local_max_small = maximum_filter(dist_transform, size = 20)
     dist_max = dist_transform.max()
-    #peaks_global = dist_transform > dist_max * peak_multiplier
     peaks = (dist_transform == local_max_large) & (dist_transform == local_max_small) | (dist_transform > peak_multiplier * dist_max)
-    #peaks = peaks_local | peaks_global
+
     # Create visualization with threshold line
     dist_normalized = cv2.normalize(dist_transform, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
 
