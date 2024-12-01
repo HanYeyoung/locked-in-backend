@@ -185,26 +185,6 @@ def merge_and_clean_lines(image, kernel_size=5, merge_distance=5):
 
     return skeleton
 
-# # Define the top-left and bottom-right coordinates for Memorial Union, Madison, Wisconsin
-# top_left_lat = 43.0771     # Latitude of the top-left corner
-# top_left_lon = -89.4000    # Longitude of the top-left corner
-# bottom_right_lat = 43.0759 # Latitude of the bottom-right corner
-# bottom_right_lon = -89.3990 # Longitude of the bottom-right corner
-
-# Address of the building and Mapbox access token
-address = "800 Langdon Street, Madison, WI"  # Replace with the desired address
-access_token = "pk.eyJ1Ijoic2ltYXJqaXQxMjMiLCJhIjoiY20xb2V1cjM2MTR5YjJpcHZwNGVxbG5jeiJ9.1ppiJSjLROk1SM71_zHm9Q"  # Replace with your actual Mapbox access token
-
-# Retrieve bounding box for the address
-# Retrieve bounding box for the address using OSM
-bounds = get_building_bounds_osm(address)
-if not bounds:
-    raise ValueError("Could not retrieve bounding box for the specified address.")
-top_left, bottom_right = bounds
-top_left_lat, top_left_lon = top_left
-bottom_right_lat, bottom_right_lon = bottom_right
-
-
 # Calculate degrees per pixel based on the image dimensions and coordinates
 def calculate_degrees_per_pixel(image_shape, top_left_lat, top_left_lon, bottom_right_lat, bottom_right_lon):
     image_height, image_width = image_shape[:2]
