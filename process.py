@@ -14,35 +14,92 @@ import matplotlib.pyplot as plt
 from PIL import Image
 pytesseract.pytesseract.tesseract_cmd = r'/opt/homebrew/bin/tesseract'
 
-def remove_text(image, conf_threshold=60, min_area=100, max_area=10000):
-    print("removing text...")
 
-    #get image data
-    ocr_results = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
+def remove_text(self, image, conf_threshold=40, min_area=20, max_area=50000):
+    """
+    Enhanced text removal function using multiple detection methods
+    """
+    # Create a copy and get grayscale
+    working_image = image.copy()
+    gray = cv2.cvtColor(working_image, cv2.COLOR_BGR2GRAY)
 
-    #add rectangles
+    # Create mask for text regions
     mask = np.zeros(image.shape[:2], dtype=np.uint8)
-    for i in range(len(ocr_results['text'])):
-        conf = int(ocr_results['conf'][i])
-        if conf > conf_threshold:
-            x, y, w, h = ocr_results['left'][i], ocr_results['top'][i], ocr_results['width'][i], ocr_results['height'][
-                i]
-            area = w * h
-            if min_area < area < max_area:
+
+    # Method 1: Basic Thresholding for Text Detection
+    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    # Find all connected components (potential text regions)
+    connectivity = 8
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary, connectivity, cv2.CV_32S)
+
+    # Filter components by size
+    for i in range(1, num_labels):  # Skip background label 0
+        area = stats[i, cv2.CC_STAT_AREA]
+        if min_area < area < max_area:
+            x = stats[i, cv2.CC_STAT_LEFT]
+            y = stats[i, cv2.CC_STAT_TOP]
+            w = stats[i, cv2.CC_STAT_WIDTH]
+            h = stats[i, cv2.CC_STAT_HEIGHT]
+
+            # Filter by aspect ratio (text usually has specific aspect ratios)
+            aspect_ratio = w / h if h != 0 else 0
+            if 0.2 < aspect_ratio < 15:  # Typical text aspect ratio range
                 cv2.rectangle(mask, (x, y), (x + w, y + h), (255), -1)
 
+    # Method 2: MSER for text region detection
+    mser = cv2.MSER_create(
+        _min_area=100,
+        _max_area=5000,
+        _delta=5,
+        _max_variation=0.5
+    )
 
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 1))
+    # Detect regions
+    regions, _ = mser.detectRegions(gray)
+
+    # Convert regions to rectangles and add to mask
+    for region in regions:
+        x, y, w, h = cv2.boundingRect(region)
+        area = w * h
+        if min_area < area < max_area:
+            aspect_ratio = w / h if h != 0 else 0
+            if 0.2 < aspect_ratio < 15:
+                cv2.rectangle(mask, (x, y), (x + w, y + h), (255), -1)
+
+    # Method 3: Modified Tesseract approach with different configs
+    custom_config = r'--oem 3 --psm 6'  # Assume uniform text on uniform background
+    ocr_results = pytesseract.image_to_data(working_image, output_type=pytesseract.Output.DICT, config=custom_config)
+
+    for i in range(len(ocr_results['text'])):
+        conf = int(ocr_results['conf'][i])
+        text = ocr_results['text'][i].strip()
+
+        if conf > conf_threshold and text:
+            x, y, w, h = (ocr_results['left'][i], ocr_results['top'][i],
+                          ocr_results['width'][i], ocr_results['height'][i])
+            area = w * h
+            if min_area < area < max_area:
+                padding = int(min(w, h) * 0.2)
+                x = max(0, x - padding)
+                y = max(0, y - padding)
+                w = min(image.shape[1] - x, w + 2 * padding)
+                h = min(image.shape[0] - y, h + 2 * padding)
+                cv2.rectangle(mask, (x, y), (x + w, y + h), (255), -1)
+
+    # Enhance the mask
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_DILATE, kernel)
 
-    cv2.imshow("blocked out text", mask)
-    cv2.waitKey(0)
-    # invert mask to create inpaint area
+    # Debug: Save the mask (optional)
+    # cv2.imwrite("text_mask.jpg", mask)
+
+    # Apply inpainting
     img_for_inpaint = cv2.bitwise_and(image, image, mask=cv2.bitwise_not(mask))
-    result = cv2.inpaint(img_for_inpaint, mask, 2, cv2.INPAINT_TELEA)
+    result = cv2.inpaint(img_for_inpaint, mask, 3, cv2.INPAINT_TELEA)
 
-    return result
+    return result  # Return both result and mask for debugging
 
 def extract_floor_plan(image_path, mp = 0.1):
     print("cropping...")

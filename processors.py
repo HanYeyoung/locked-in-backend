@@ -7,7 +7,6 @@ from skimage.morphology import remove_small_objects
 from skimage.segmentation import watershed, clear_border
 from scipy.ndimage import distance_transform_edt, maximum_filter
 
-
 class FloorPlanProcessor:
     def __init__(self):
         pytesseract.pytesseract.tesseract_cmd = r'/opt/homebrew/bin/tesseract'
@@ -51,26 +50,47 @@ class FloorPlanProcessor:
                 "error": str(e)
             }
 
-    def remove_text(self, image, conf_threshold=60, min_area=100, max_area=10000):
-        """Your existing remove_text function"""
-        ocr_results = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
+    def remove_text(self, image):
+        """
+        Text removal using EasyOCR with improved inpainting
+        """
+        import easyocr
 
-        mask = np.zeros(image.shape[:2], dtype=np.uint8)
-        for i in range(len(ocr_results['text'])):
-            conf = int(ocr_results['conf'][i])
-            if conf > conf_threshold:
-                x, y, w, h = (ocr_results['left'][i], ocr_results['top'][i],
-                              ocr_results['width'][i], ocr_results['height'][i])
-                area = w * h
-                if min_area < area < max_area:
-                    cv2.rectangle(mask, (x, y), (x + w, y + h), (255), -1)
+        # Store original image
+        original = image.copy()
 
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 1))
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        # Convert to grayscale for background analysis
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        img_for_inpaint = cv2.bitwise_and(image, image, mask=cv2.bitwise_not(mask))
-        result = cv2.inpaint(img_for_inpaint, mask, 2, cv2.INPAINT_TELEA)
+        # Initialize EasyOCR reader
+        reader = easyocr.Reader(['en'])
+
+        # Create mask for text regions
+        text_mask = np.zeros(image.shape[:2], dtype=np.uint8)
+
+        # Detect text regions
+        results = reader.readtext(image)
+
+        # Process each detected text region
+        for box in results:
+            points = box[0]
+            pts = np.array(points, dtype=np.int32)
+
+            # Increase padding for better coverage
+            padding = 0
+            min_x = max(0, np.min(pts[:, 0]) - padding)
+            min_y = max(0, np.min(pts[:, 1]) - padding)
+            max_x = min(image.shape[1], np.max(pts[:, 0]) + padding)
+            max_y = min(image.shape[0], np.max(pts[:, 1]) + padding)
+
+            # Draw filled rectangle
+            cv2.rectangle(text_mask, (int(min_x), int(min_y)), (int(max_x), int(max_y)), 255, -1)
+
+        # First pass: larger radius for overall structure
+        result = cv2.inpaint(image, text_mask, 5, cv2.INPAINT_NS)
+
+        # Second pass: smaller radius for details
+        result = cv2.inpaint(result, text_mask, 3, cv2.INPAINT_TELEA)
 
         return result
 
