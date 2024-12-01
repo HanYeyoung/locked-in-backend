@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import GeoJSONButtons from "./GeoJSONButtons";
 
 const FloorInterface = () => {
     const buildingId = useParams().buildingId;
@@ -62,6 +63,42 @@ const FloorInterface = () => {
                 ])
                 .addTo(map);
 
+            if (floor.geojson) {
+                // Remove existing floor layer if it exists
+                if (map.getSource("floor")) {
+                    map.removeLayer("floor-fill");
+                    map.removeLayer("floor-border");
+                    map.removeSource("floor");
+                }
+
+                map.addSource("floor", {
+                    type: "geojson",
+                    data: floor.geojson,
+                });
+
+                // Add floor fill layer
+                map.addLayer({
+                    id: "floor-fill",
+                    type: "fill",
+                    source: "floor",
+                    paint: {
+                        "fill-color": "#FF0000",
+                        "fill-opacity": 0.1,
+                    },
+                });
+
+                // Add floor border layer
+                map.addLayer({
+                    id: "floor-border",
+                    type: "line",
+                    source: "floor",
+                    paint: {
+                        "line-color": "#000000",
+                        "line-width": 2,
+                        "line-opacity": 0.3,
+                    },
+                });
+            }
             const drawBox = () => {
                 // Remove existing box if it exists
                 if (map.getSource("box")) {
@@ -297,9 +334,7 @@ const FloorInterface = () => {
                     </div>
                     <div className="rounded-3xl border border-white p-6 flex-1">
                         <h3 className="text-2xl font-bold mb-4">GeoJSON</h3>
-                        <button className="w-full py-3 border border-white rounded-full hover:bg-blue-600 hover:border-2 duration-200">
-                            Download GeoJSON
-                        </button>
+                        <GeoJSONButtons floor={floor} />
                     </div>
                 </div>
             </div>
