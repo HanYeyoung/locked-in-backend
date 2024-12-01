@@ -12,6 +12,10 @@ from skimage.segmentation import watershed, clear_border
 import pytesseract
 from scipy.ndimage import maximum_filter
 from skimage.morphology import skeletonize
+from getcoordinates import get_building_bounds_mapbox, get_coordinates_mapbox
+from getcoordinates import get_building_bounds_osm
+
+
 import matplotlib.pyplot as plt
 from PIL import Image
 import json
@@ -87,73 +91,6 @@ def extract_floor_plan(image_path, mp = 0.1):
     # cv2.imshow("cropped image", cropped)
     cv2.waitKey(0)
     return cropped
-
-
-# def remove_gaps(image_path, peak_multiplier=0.15, min_size_ratio=0.03, search_ratio=0.05):
-#     image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-#
-#     # Check if the image is loaded correctly
-#     if image is None:
-#         raise ValueError("Image not loaded. Check the file path.")
-#
-#     _, binary_image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-#
-#     dist_transform = distance_transform_edt(binary_image)
-#
-#     # Calculate thresholds and peaks
-#
-#     local_max_large = maximum_filter(dist_transform, size=100)  # Adjust size parameter as needed
-#     local_max_small = maximum_filter(dist_transform, size=20)
-#     dist_max = dist_transform.max()
-#     #peaks_global = dist_transform > dist_max * peak_multiplier
-#     peaks = (dist_transform == local_max_large) & (dist_transform == local_max_small) | (dist_transform > peak_multiplier * dist_max)
-#     #peaks = peaks_local | peaks_global
-#     # Create visualization with threshold line
-#     dist_normalized = cv2.normalize(dist_transform, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-#
-#     dist_rgb = cv2.cvtColor(dist_normalized, cv2.COLOR_GRAY2RGB)
-#
-#     # cv2.imshow('Distance Transform', dist_rgb)
-#     cv2.waitKey(0)
-#
-#     dist_rgb[peaks] = [0, 0, 255]
-#     # cv2.imshow('Distance Transform with Peaks Identified', dist_rgb)
-#     cv2.waitKey(0)
-#
-#     markers = cv2.connectedComponents(np.uint8(peaks))[1]
-#     inverted_dist_transform = -dist_transform
-#
-#     labels = watershed(inverted_dist_transform, markers, mask=binary_image)
-#     cleared_labels = clear_border(labels)
-#
-#     # Remove small components
-#     min_size = int((image.shape[0] * image.shape[1]) * (min_size_ratio ** 2))
-#     final_labels = remove_small_objects(cleared_labels, min_size=min_size)
-#
-#     # Create a color image to draw the contours
-#     contour_image = np.zeros((image.shape[0], image.shape[1], 3), dtype=np.uint8)
-#
-#     # Get unique labels excluding the background (0)
-#     unique_labels = np.unique(final_labels)
-#     unique_labels = unique_labels[unique_labels > 0]
-#
-#     # Generate distinct colors for each label
-#     colors = np.random.randint(50, 255, size=(len(unique_labels), 3))
-#
-#     # Draw contours for each unique label
-#     for i, label in enumerate(unique_labels):
-#         # Find contours for the current label
-#         contours, _ = cv2.findContours((final_labels == label).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-#
-#         # merge the contours of rooms into one contour, this results in overlapping of contour
-#         # merge_distance of 8 is good for memory union floor plan
-#         merged_contours = merge_close_contours(contours, image.shape[0], image.shape[1], merge_distance= 8 )
-#
-#         # Draw contours with the corresponding color
-#         for contour in  merged_contours:
-#             cv2.drawContours(contour_image, [contour], -1, colors[i].tolist(), 2)
-#
-#     return contour_image
 
 def remove_gaps(image_path, peak_multiplier=0.15, min_size_ratio=0.03, search_ratio=0.05):
     image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
@@ -248,11 +185,25 @@ def merge_and_clean_lines(image, kernel_size=5, merge_distance=5):
 
     return skeleton
 
-# Define the top-left and bottom-right coordinates for Memorial Union, Madison, Wisconsin
-top_left_lat = 43.0771     # Latitude of the top-left corner
-top_left_lon = -89.4000    # Longitude of the top-left corner
-bottom_right_lat = 43.0759 # Latitude of the bottom-right corner
-bottom_right_lon = -89.3990 # Longitude of the bottom-right corner
+# # Define the top-left and bottom-right coordinates for Memorial Union, Madison, Wisconsin
+# top_left_lat = 43.0771     # Latitude of the top-left corner
+# top_left_lon = -89.4000    # Longitude of the top-left corner
+# bottom_right_lat = 43.0759 # Latitude of the bottom-right corner
+# bottom_right_lon = -89.3990 # Longitude of the bottom-right corner
+
+# Address of the building and Mapbox access token
+address = "800 Langdon Street, Madison, WI"  # Replace with the desired address
+access_token = "pk.eyJ1Ijoic2ltYXJqaXQxMjMiLCJhIjoiY20xb2V1cjM2MTR5YjJpcHZwNGVxbG5jeiJ9.1ppiJSjLROk1SM71_zHm9Q"  # Replace with your actual Mapbox access token
+
+# Retrieve bounding box for the address
+# Retrieve bounding box for the address using OSM
+bounds = get_building_bounds_osm(address)
+if not bounds:
+    raise ValueError("Could not retrieve bounding box for the specified address.")
+top_left, bottom_right = bounds
+top_left_lat, top_left_lon = top_left
+bottom_right_lat, bottom_right_lon = bottom_right
+
 
 # Calculate degrees per pixel based on the image dimensions and coordinates
 def calculate_degrees_per_pixel(image_shape, top_left_lat, top_left_lon, bottom_right_lat, bottom_right_lon):
@@ -306,6 +257,17 @@ if __name__ == "__main__":
 
     # Ensure output folder exists
     os.makedirs(output_folder, exist_ok=True)
+
+    # Address setup
+    address = "800 Langdon Street, Madison, WI"  # Example address
+
+    # Retrieve the bounding box for the address using OSM
+    bounds = get_building_bounds_osm(address)
+    if not bounds:
+        raise ValueError("Could not retrieve bounding box for the specified address.")
+    top_left, bottom_right = bounds
+    top_left_lat, top_left_lon = top_left
+    bottom_right_lat, bottom_right_lon = bottom_right
 
     # Process all images in the folder
     for filename in os.listdir(input_folder):
