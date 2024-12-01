@@ -35,7 +35,7 @@ class FloorPlanProcessor:
             _, rooms_buffer = cv2.imencode('.jpg', processed_image)
 
             # Create GeoJSON from contours
-            geojson = self.create_geojson(room_contours)
+            geojson = self.create_geojson(room_contours, coordinates)
 
             return {
                 "status": "success",
@@ -145,31 +145,59 @@ class FloorPlanProcessor:
 
         return contour_image, room_contours
 
-    def create_geojson(self, room_contours) -> Dict:
-        """Convert room contours to GeoJSON format"""
+    def create_geojson(self, room_contours, coordinates) -> Dict:
+        """Convert room contours to GeoJSON with proper coordinate scaling"""
         features = []
+
+        # Get the coordinate bounds
+        min_lat = coordinates['min_lat']
+        max_lat = coordinates['max_lat']
+        min_long = coordinates['min_long']
+        max_long = coordinates['max_long']
+
+        lat_span = max_lat - min_lat
+        long_span = max_long - min_long
+        # Calculate the span
+        all_points = np.concatenate([cont['contour'] for cont in room_contours])
+        max_x = np.max(all_points[:, :, 0])
+        max_y = np.max(all_points[:, :, 1])
+
         for room in room_contours:
             contour = room['contour']
             color = room['color']
 
-            # Convert contour to coordinates
-            coordinates = contour.squeeze().tolist()
-            if len(coordinates) < 3:  # Skip invalid polygons
-                continue
+            # Reshape contour if needed
+            if len(contour.shape) == 3 and contour.shape[1] == 1:
+                contour = contour.reshape(-1, 2)
 
-            # Ensure the polygon is closed
-            if coordinates[0] != coordinates[-1]:
-                coordinates.append(coordinates[0])
+            # Convert contour points to geographic coordinates
+            geo_coords = []
+            for point in contour:
+                x, y = point[0], point[1]
+
+                # Scale x and y to 0-1 range based on max dimensions from contours
+                x_scaled = x / max_x
+                y_scaled = 1 - (y / max_y)  # Flip Y axis
+
+                # Convert to geographic coordinates using spans
+                longitude = min_long + (long_span * x_scaled)
+                latitude = min_lat + (lat_span * y_scaled)
+
+                geo_coords.append([longitude, latitude])
+
+            # Close the polygon if needed
+            if len(geo_coords) > 0 and geo_coords[0] != geo_coords[-1]:
+                geo_coords.append(geo_coords[0])
 
             feature = {
                 "type": "Feature",
                 "geometry": {
                     "type": "Polygon",
-                    "coordinates": [coordinates]
+                    "coordinates": [geo_coords]
                 },
                 "properties": {
                     "color": color,
-                    "area": cv2.contourArea(contour)
+                    "area": float(cv2.contourArea(contour))
                 }
             }
             features.append(feature)
@@ -178,7 +206,6 @@ class FloorPlanProcessor:
             "type": "FeatureCollection",
             "features": features
         }
-
     @staticmethod
     def encode_image(image) -> bytes:
         """Convert OpenCV image to bytes"""
