@@ -9,7 +9,8 @@ from typing import Dict, Any, Optional
 from processors import FloorPlanProcessor
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from typing import Dict, Any
-
+import requests
+import io
 class DatabaseHandler:
     def __init__(self):
         self.buildings = db.buildings
@@ -152,6 +153,82 @@ class DatabaseHandler:
             return floor
         return None
 
+    async def update_floor_coordinates(self, floor_id: str, coordinates: Dict[str, Any]) -> Dict[str, Any]:
+        """Update floor coordinates and reprocess the floor plan if it exists"""
+        try:
+            # Find the floor and store original coordinates
+            floor = self.floors.find_one({"_id": ObjectId(floor_id)})
+            if not floor:
+                raise ValueError("Floor not found")
+
+            original_coordinates = floor.get('coordinates', {})
+
+            # Update floor coordinates
+            floor_update = self.floors.update_one(
+                {"_id": ObjectId(floor_id)},
+                {"$set": {
+                    "coordinates": coordinates,
+                    "updated_at": datetime.utcnow()
+                }}
+            )
+
+            # Check if this floor has images to reprocess
+            if "images" in floor and "original" in floor["images"]:
+                try:
+                    # Download the original image from Cloudinary
+                    original_url = floor["images"]["original"]
+                    response = requests.get(original_url)
+                    if response.status_code == 200:
+                        # Create a file-like object from the image data
+                        class UploadFile:
+                            def __init__(self, file, filename):
+                                self.file = file
+                                self.filename = filename
+
+                            async def read(self):
+                                return self.file.read()
+
+                        file = io.BytesIO(response.content)
+                        upload_file = UploadFile(file, f"floor_{floor_id}.jpg")
+
+                        # Process the floor plan
+                        result = await self.process_floor_plan(
+                            floor_id,
+                            upload_file,
+                            upload_file.filename
+                        )
+
+                        return {
+                            "floor_id": floor_id,
+                            "coordinates": coordinates,
+                            "status": "reprocessed",
+                            "result": result
+                        }
+                    else:
+                        raise Exception("Failed to download original image")
+
+                except Exception as e:
+                    # Revert coordinates update if processing fails
+                    self.floors.update_one(
+                        {"_id": ObjectId(floor_id)},
+                        {"$set": {
+                            "coordinates": original_coordinates,
+                            "status": "error",
+                            "error_message": str(e)
+                        }}
+                    )
+                    raise Exception(f"Failed to reprocess floor plan: {str(e)}")
+
+            # Return updated data if no images needed processing
+            return {
+                "floor_id": floor_id,
+                "coordinates": coordinates,
+                "status": "updated",
+                "message": "Coordinates updated successfully. No images to reprocess."
+            }
+
+        except Exception as e:
+            raise e
 
     async def get_building_floors(self, building_id: str) -> list:
         """Get all floors for a building"""

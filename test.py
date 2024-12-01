@@ -1,41 +1,27 @@
-import asyncio
-from database import DatabaseHandler
-import os
-from bson import ObjectId
-from datetime import datetime
+import requests
 
+# Test data
+floor_id = "674bf2350aedf51f6ed9c5d7"
+coordinates = {
+    "min_lat": 43.07613222169164,
+    "max_lat": 43.07646261221137,
+    "min_long": -89.40027950525828,
+    "max_long": -89.39964155730027,
+    "center": {
+        "lat": 43.076297416951505,
+        "long": -89.39996053127928
+    }
+}
 
-async def test_database_operations():
-    # Initialize database handler
-    db = DatabaseHandler()
+# Make the PUT request
+response = requests.put(
+    f"http://localhost:8000/floors/{floor_id}/coordinates",
+    json=coordinates
+)
 
-    # Use existing floor ID
-    floor_id = "674bdf22f719dd199cfa2b7d"
-
-    try:
-        # Path to existing test image
-        test_image_path = os.path.join("..", "floorplans", "raw", "MU_4.jpg")
-
-        # Mock file class
-        class MockFile:
-            async def read(self):
-                with open(test_image_path, 'rb') as f:
-                    return f.read()
-
-            @property
-            def filename(self):
-                return "MU_4.jpg"
-
-        # Process floor plan
-        result = await db.process_floor_plan(floor_id, MockFile(), "MU_4.jpg")
-
-        # Print the result for debugging
-        print("Processing Result:", result)
-
-    except Exception as e:
-        print(f"Test failed with error: {str(e)}")
-        raise
-
-
-if __name__ == "__main__":
-    asyncio.run(test_database_operations())
+# Print results
+print(f"Status Code: {response.status_code}")
+try:
+    print(f"Response: {response.json()}")
+except:
+    print(f"Raw Response: {response.text}")

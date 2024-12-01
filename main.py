@@ -18,6 +18,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+class Coordinates(BaseModel):
+    min_lat: float
+    max_lat: float
+    min_long: float
+    max_long: float
+    center: Dict[str, float]
 class BuildingCreate(BaseModel):
     name: str
     address: str
@@ -95,6 +101,17 @@ async def get_floor(floor_id: str):
     if not floor:
         raise HTTPException(status_code=404, detail="Floor not found")
     return floor
+
+@app.put("/floors/{floor_id}/coordinates")
+async def update_floor_coordinates(
+    floor_id: str,
+    coordinates: Coordinates
+):
+    """Update floor coordinates and reprocess floor plan if images exist"""
+    try:
+        return await db.update_floor_coordinates(floor_id, coordinates.dict())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
