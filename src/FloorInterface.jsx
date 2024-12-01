@@ -11,9 +11,13 @@ const FloorInterface = () => {
     const [dragActive, setDragActive] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [showUpdateButton, setShowUpdateButton] = useState(false);
+    const [updating, setUpdating] = useState(false);
     const fileInputRef = useRef(null);
     const mapContainer = useRef(null);
     const map = useRef(null);
+    const blMarker = useRef(null);
+    const trMarker = useRef(null);
 
     useEffect(() => {
         getFloor();
@@ -25,6 +29,69 @@ const FloorInterface = () => {
         }
     }, [floor]);
 
+    const resetCoordinates = () => {
+        if (!floor.coordinates) return;
+        if (blMarker.current && trMarker.current) {
+            blMarker.current.setLngLat([
+                floor.coordinates.min_long,
+                floor.coordinates.min_lat,
+            ]);
+            trMarker.current.setLngLat([
+                floor.coordinates.max_long,
+                floor.coordinates.max_lat,
+            ]);
+        }
+        getMap();
+        setShowUpdateButton(false);
+    };
+
+    const updateFloorCoordinates = async () => {
+        if (!blMarker.current || !trMarker.current) return;
+
+        setUpdating(true);
+        const blCoords = blMarker.current.getLngLat();
+        const trCoords = trMarker.current.getLngLat();
+
+        const coordinates = {
+            min_lat: Math.min(blCoords.lat, trCoords.lat),
+            max_lat: Math.max(blCoords.lat, trCoords.lat),
+            min_long: Math.min(blCoords.lng, trCoords.lng),
+            max_long: Math.max(blCoords.lng, trCoords.lng),
+            center: {
+                lat: (blCoords.lat + trCoords.lat) / 2,
+                long: (blCoords.lng + trCoords.lng) / 2,
+            },
+        };
+        console.log("Sending coordinates:", coordinates);
+        console.log("Stringified:", JSON.stringify(coordinates));
+
+        fetch(`http://localhost:8000/floors/${floorId}/coordinates`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(coordinates),
+        })
+            .then((res) => {
+                console.log(res);
+                if (!res.ok) {
+                    throw new Error("Failed to update");
+                }
+                return res.json();
+            })
+            .then((data) => {
+                console.log(data);
+                getFloor();
+            })
+            .catch((error) => {
+                console.error(error.message);
+            })
+            .finally(() => {
+                setUpdating(false);
+                setShowUpdateButton(false);
+            });
+    };
+
     const getMap = () => {
         setLoading(true);
         mapboxgl.accessToken =
@@ -32,12 +99,12 @@ const FloorInterface = () => {
 
         var map = new mapboxgl.Map({
             container: mapContainer.current,
-            style: "mapbox://styles/mapbox/streets-v12",
+            style: "mapbox://styles/mapbox/dark-v11",
             center: [
                 floor.coordinates.center.long,
                 floor.coordinates.center.lat,
             ],
-            zoom: 17,
+            zoom: 18,
         });
 
         map.on("load", () => {
@@ -63,8 +130,10 @@ const FloorInterface = () => {
                 ])
                 .addTo(map);
 
+            blMarker.current = bl;
+            trMarker.current = tr;
+
             if (floor.geojson) {
-                // Remove existing floor layer if it exists
                 if (map.getSource("floor")) {
                     map.removeLayer("floor-fill");
                     map.removeLayer("floor-border");
@@ -82,8 +151,8 @@ const FloorInterface = () => {
                     type: "fill",
                     source: "floor",
                     paint: {
-                        "fill-color": "#FF0000",
-                        "fill-opacity": 0.1,
+                        "fill-color": "#FFFFFF",
+                        "fill-opacity": 0.5,
                     },
                 });
 
@@ -93,9 +162,9 @@ const FloorInterface = () => {
                     type: "line",
                     source: "floor",
                     paint: {
-                        "line-color": "#000000",
+                        "line-color": "#FFFFFF",
                         "line-width": 2,
-                        "line-opacity": 0.3,
+                        "line-opacity": 1,
                     },
                 });
             }
@@ -148,20 +217,11 @@ const FloorInterface = () => {
                         "line-width": 2,
                     },
                 });
+                setShowUpdateButton(true);
             };
 
             const updateBounds = () => {
-                const minCoords = bl.getLngLat();
-                const maxCoords = tr.getLngLat();
-
                 drawBox();
-
-                console.log("New bounds:", {
-                    min_long: minCoords.lng,
-                    min_lat: minCoords.lat,
-                    max_long: maxCoords.lng,
-                    max_lat: maxCoords.lat,
-                });
             };
 
             // Draw initial box
@@ -172,6 +232,7 @@ const FloorInterface = () => {
             tr.on("dragend", updateBounds);
             bl.on("drag", drawBox);
             tr.on("drag", drawBox);
+            setShowUpdateButton(false);
         });
         setLoading(false);
         return () => map.remove();
@@ -265,7 +326,28 @@ const FloorInterface = () => {
             <div className="grid grid-cols-5 gap-6 p-4">
                 <div className="col-span-3">
                     <div className="rounded-3xl border border-white p-6">
-                        <h3 className="text-2xl font-bold mb-4">Location</h3>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-2xl font-bold ">Location</h3>
+                            {showUpdateButton && (
+                                <div className="justify-end ">
+                                    <button
+                                        onClick={() => updateFloorCoordinates()}
+                                        disabled={updating}
+                                        className="px-4 py-2 text-white rounded-full border border-white hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition duration-200"
+                                    >
+                                        {updating
+                                            ? "Updating..."
+                                            : "Update Coordinates"}
+                                    </button>
+                                    <button
+                                        onClick={() => resetCoordinates()}
+                                        className="px-4 py-2 mx-4 text-white rounded-full border border-white hover:bg-red-700 transition duration-200"
+                                    >
+                                        Reset
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                         {floor.coordinates ? (
                             <div
                                 id="map"
@@ -332,7 +414,7 @@ const FloorInterface = () => {
                             </div>
                         )}
                     </div>
-                    <div className="rounded-3xl border border-white p-6 flex-1">
+                    <div className="rounded-3xl border border-white p-6 flex-1 h-full">
                         <h3 className="text-2xl font-bold mb-4">GeoJSON</h3>
                         <GeoJSONButtons floor={floor} />
                     </div>

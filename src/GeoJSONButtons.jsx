@@ -35,7 +35,7 @@ const GeoJSONButtons = ({ floor }) => {
     };
 
     return (
-        <div className="flex gap-2">
+        <div className="flex gap-2 pt-4">
             <button
                 onClick={handleDownload}
                 className="w-full py-3 border border-white rounded-full hover:bg-blue-600 duration-200 flex items-center justify-center gap-2"
