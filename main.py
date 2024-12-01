@@ -3,6 +3,7 @@ import numpy as np
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
+from tqdm import tqdm
 from scipy.ndimage import distance_transform_edt
 from skimage.morphology import remove_small_objects
 from skimage.segmentation import watershed, clear_border
@@ -17,24 +18,14 @@ def generate_color_palette(num_colors):
     return [tuple(np.random.randint(0, 255, 3).tolist()) for _ in range(num_colors)]
 
 
-def generate_random_color():
-    """Generate a single random colour."""
-    return (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-
-
 def midpoint(x1, y1, x2, y2):
     """Calculate the midpoint of two points."""
     return (x1 + x2) // 2, (y1 + y2) // 2
 
 
 # Core Image Processing Functions
-def remove_gaps(image_path, min_size=500):
+def remove_gaps(image, min_size=500):
     """Remove small gaps and extract clean contours."""
-    # Load grayscale image
-    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    if image is None:
-        raise ValueError("Image not loaded. Check the file path.")
-    
     # Threshold and distance transform
     _, binary_image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     dist_transform = distance_transform_edt(binary_image)
@@ -48,7 +39,7 @@ def remove_gaps(image_path, min_size=500):
     final_labels = remove_small_objects(cleared_labels, min_size=min_size)
 
     # Generate contour image
-    contour_image = np.zeros((image.shape[0], image.shape[1], 3), dtype=np.uint8)
+    contour_image = np.zeros((*image.shape, 3), dtype=np.uint8)
     unique_labels = np.unique(final_labels[final_labels > 0])
     colors = generate_color_palette(len(unique_labels))
 
@@ -61,11 +52,8 @@ def remove_gaps(image_path, min_size=500):
     return contour_image
 
 
-def extract_floor_plan(image_path):
+def extract_floor_plan(image_path, pipeline):
     """Extract the main floor plan by removing text and background."""
-    # Initialize OCR pipeline
-    pipeline = keras_ocr.pipeline.Pipeline()
-
     # Read and preprocess image
     img = cv2.imread(image_path)
     if img is None:
@@ -104,14 +92,10 @@ def extract_floor_plan(image_path):
     return result[y:y + h, x:x + w]
 
 
-def identify_rooms(image_path, min_room_area=350):
+def identify_rooms(image, min_room_area=350):
     """Identify and label rooms based on contours."""
-    img = cv2.imread(image_path)
-    if img is None:
-        raise ValueError(f"Failed to load image from {image_path}")
-    
     # Convert to grayscale and threshold
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     _, binary = cv2.threshold(gray, 100, 255, cv2.THRESH_BINARY)
 
     # Extract room contours
@@ -119,7 +103,7 @@ def identify_rooms(image_path, min_room_area=350):
     room_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_room_area]
 
     # Draw and label rooms
-    result = img.copy()
+    result = image.copy()
     colors = generate_color_palette(len(room_contours))
     for i, cnt in enumerate(room_contours):
         cv2.drawContours(result, [cnt], 0, colors[i], 2)
@@ -133,10 +117,9 @@ def identify_rooms(image_path, min_room_area=350):
 
 
 # Unified Processing Pipeline
-def process_image(image_path, output_dir):
+def process_image(image_path, output_dir, pipeline):
     """Process an image through the full pipeline."""
-    print(f"Processing {image_path}...")
-    cropped = extract_floor_plan(image_path)
+    cropped = extract_floor_plan(image_path, pipeline)
     gaps_removed = remove_gaps(cropped)
     room_labels = identify_rooms(gaps_removed)
 
@@ -154,7 +137,10 @@ if __name__ == "__main__":
     output_dir = "floorplans/output"
     image_paths = [os.path.join(input_dir, path) for path in os.listdir(input_dir) if path.endswith(('.png', '.jpg'))]
 
+    # Initialise OCR pipeline outside the loop for efficiency
+    pipeline = keras_ocr.pipeline.Pipeline()
+
     start_time = time.time()
     with ThreadPoolExecutor() as executor:
-        executor.map(lambda p: process_image(p, output_dir), image_paths)
+        list(tqdm(executor.map(lambda p: process_image(p, output_dir, pipeline), image_paths), total=len(image_paths)))
     print(f"Processing completed in {time.time() - start_time:.2f} seconds.")
