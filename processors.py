@@ -94,31 +94,57 @@ class FloorPlanProcessor:
 
         return result
 
-    def extract_floor_plan(self, image, min_mp=0.01, max_mp=0.06):
+    def extract_floor_plan(self, image):
+        """Main function to extract and crop floor plan"""
         # Remove text first
         image = self.remove_text(image)
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        # Get Otsu threshold and use it to calculate image complexity
-        thresh, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-
-        # Calculate number of edges as a measure of image complexity
-        edges = cv2.Canny(gray, thresh / 2, thresh)
-        edge_density = np.count_nonzero(edges) / (edges.shape[0] * edges.shape[1])
-
-        mp = max_mp - (edge_density * (max_mp - min_mp))
-        mp = np.clip(mp, min_mp, max_mp)
-
+        # Initial binary threshold
+        _, binary = cv2.threshold(gray, 70, 255, cv2.THRESH_BINARY_INV)
         height, width = gray.shape
-        kernel = np.ones((int(height * mp), int(width * mp)), np.uint8)
-        closed = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
 
-        closed = cv2.medianBlur(closed, 7)
+        # Initial small closing to connect very close components
+        small_kernel = np.ones((3, 3), np.uint8)
+        closed = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, small_kernel, iterations=2)
 
+        # Find contours to analyze gaps
         contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Find minimum distance from each contour to image border
+        max_gap = 0
+        for contour in contours:
+            for point in contour[:, 0]:
+                x, y = point
+                # Distance to nearest border
+                dist_to_border = min(x, y, width - x, height - y)
+                max_gap = max(max_gap, dist_to_border)
+
+        # Calculate adaptive mp based on largest gap
+        mp = (max_gap / min(height, width)) * 1.2  # Add 20% margin
+        mp = np.clip(mp, 0.01, 0.04)  # More conservative upper bound
+
+        # Flood fill from borders to identify and remove background
+        mask = np.zeros((height + 2, width + 2), np.uint8)
+        flood_fill = closed.copy()
+        cv2.floodFill(flood_fill, mask, (0, 0), 255)
+
+        # Invert flood fill result to get the floor plan
+        flood_fill_inv = cv2.bitwise_not(flood_fill)
+
+        # Combine with original binary
+        floor_plan = closed | flood_fill_inv
+
+        # Do closing with adaptive mp value
+        kernel = np.ones((int(height * mp), int(width * mp)), np.uint8)
+        floor_plan = cv2.morphologyEx(floor_plan, cv2.MORPH_CLOSE, kernel)
+
+        # Find contours
+        contours, _ = cv2.findContours(floor_plan, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
             raise Exception("No contours found")
 
+        # Filter by minimum area
         min_area = (height * width) * 0.01
         valid_contours = [c for c in contours if cv2.contourArea(c) > min_area]
 
