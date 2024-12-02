@@ -96,29 +96,29 @@ const Floors = () => {
                         <input
                             type="text"
                             placeholder="Floor Name"
-                            className="p-2 rounded-2xl bg-slate-800 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                            className="p-2 rounded-3xl bg-slate-800 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
                             value={fname}
                             onChange={(e) => setFname(e.target.value)}
                         />
                         <input
                             type="text"
                             placeholder="Floor Number"
-                            className="p-2 rounded-2xl bg-slate-800 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                            className="p-2 rounded-3xl bg-slate-800 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
                             value={fnum}
                             onChange={(e) => setFnum(e.target.value)}
                         />
                         {addError && (
                             <div className="p-2, text-red-500">{addError}</div>
                         )}
-                        <div className="flex justify-end space-x-2">
+                        <div className="flex justify-end space-x-4">
                             <button
                                 onClick={() => setModal(false)}
-                                className="px-4 py-2 rounded-2xl border border-white hover:border-red-500 text-gray-300"
+                                className="px-4 py-2 rounded-3xl border border-white hover:border-red-500 text-gray-300"
                             >
                                 Cancel
                             </button>
                             <button
-                                className="px-4 py-2 rounded-2xl border border-white hover:font-bold duration-200 bg-blue-600  text-white"
+                                className="px-4 py-2 rounded-3xl border border-white duration-200 bg-black hover:bg-blue-600 text-white"
                                 onClick={() => {
                                     if (!fname || !fnum) {
                                         setAddError(
