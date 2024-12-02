@@ -94,23 +94,38 @@ class FloorPlanProcessor:
 
         return result
 
-    def extract_floor_plan(self, image, mp=0.1):
-        """Your existing extract_floor_plan function modified for server use"""
+    def extract_floor_plan(self, image, min_mp=0.01, max_mp=0.06):
         # Remove text first
         image = self.remove_text(image)
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        # Binary thresholding
-        _, binary = cv2.threshold(gray, 70, 255, cv2.THRESH_BINARY_INV)
+        # Get Otsu threshold and use it to calculate image complexity
+        thresh, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
-        # Morphological operations
+        # Calculate number of edges as a measure of image complexity
+        edges = cv2.Canny(gray, thresh / 2, thresh)
+        edge_density = np.count_nonzero(edges) / (edges.shape[0] * edges.shape[1])
+
+        mp = max_mp - (edge_density * (max_mp - min_mp))
+        mp = np.clip(mp, min_mp, max_mp)
+
         height, width = gray.shape
         kernel = np.ones((int(height * mp), int(width * mp)), np.uint8)
         closed = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
 
-        # Find contours
+        closed = cv2.medianBlur(closed, 7)
+
         contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        main_contour = max(contours, key=cv2.contourArea)
+        if not contours:
+            raise Exception("No contours found")
+
+        min_area = (height * width) * 0.01
+        valid_contours = [c for c in contours if cv2.contourArea(c) > min_area]
+
+        if not valid_contours:
+            raise Exception("No valid contours found after area filtering")
+
+        main_contour = max(valid_contours, key=cv2.contourArea)
 
         # Create mask and apply it
         mask = np.zeros(gray.shape, np.uint8)
@@ -131,7 +146,7 @@ class FloorPlanProcessor:
         _, binary_image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         dist_transform = distance_transform_edt(binary_image)
 
-        local_max_large = maximum_filter(dist_transform, size=100)
+        local_max_large = maximum_filter(dist_transform, size=60)
         local_max_small = maximum_filter(dist_transform, size=20)
         dist_max = dist_transform.max()
         peaks = ((dist_transform == local_max_large) &
@@ -143,8 +158,18 @@ class FloorPlanProcessor:
         labels = watershed(inverted_dist_transform, markers, mask=binary_image)
         cleared_labels = clear_border(labels)
 
-        min_size = int((image.shape[0] * image.shape[1]) * (min_size_ratio ** 2))
-        final_labels = remove_small_objects(cleared_labels, min_size=min_size)
+        min_border_size = image.shape[0] * image.shape[1] * 0.0001  # 1% of image size
+        border_labels = np.unique(labels[0, :])  # Get labels touching top border
+        border_labels = np.append(border_labels, np.unique(labels[-1, :]))  # bottom border
+        border_labels = np.append(border_labels, np.unique(labels[:, 0]))  # left border
+        border_labels = np.append(border_labels, np.unique(labels[:, -1]))
+
+        cleared_labels = labels.copy()
+        for label in np.unique(border_labels):
+            if np.sum(labels == label) < min_border_size:
+                cleared_labels[labels == label] = 0
+
+        final_labels = remove_small_objects(cleared_labels, min_size=min_border_size)
 
         # Create contour image
         contour_image = np.zeros((image.shape[0], image.shape[1], 3), dtype=np.uint8)

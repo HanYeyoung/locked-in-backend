@@ -17,7 +17,7 @@ def test_processor():
     }
 
     # Test paths
-    input_path = os.path.join("..", "floorplans", "raw", "MU_4.jpg")
+    input_path = os.path.join("..", "floorplans", "raw", "MU_5.jpg")
     output_dir = os.path.join("..", "floorplans", "test_output")
 
     # Create output directory if it doesn't exist
