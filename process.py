@@ -1,232 +1,139 @@
 import time
-from skimage import io
-import keras_ocr
-import math
+import os
 import cv2
 import numpy as np
-import os
-from scipy.ndimage import distance_transform_edt
-from skimage.morphology import remove_small_objects
+from tqdm import tqdm
 from skimage.segmentation import watershed, clear_border
-import pytesseract
-from scipy.ndimage import maximum_filter
-import matplotlib.pyplot as plt
-from PIL import Image
-pytesseract.pytesseract.tesseract_cmd = r'/opt/homebrew/bin/tesseract'
+from skimage.morphology import remove_small_objects
+from scipy.ndimage import distance_transform_edt
+import keras_ocr
+import random
 
 
-def remove_text(self, image, conf_threshold=40, min_area=20, max_area=50000):
-    """
-    Enhanced text removal function using multiple detection methods
-    """
-    # Create a copy and get grayscale
-    working_image = image.copy()
-    gray = cv2.cvtColor(working_image, cv2.COLOR_BGR2GRAY)
+# Utility Functions
+def generate_color_palette(num_colors):
+    """Generate a consistent colour palette."""
+    np.random.seed(42)  # For reproducibility
+    return [tuple(np.random.randint(0, 255, 3).tolist()) for _ in range(num_colors)]
 
-    # Create mask for text regions
-    mask = np.zeros(image.shape[:2], dtype=np.uint8)
 
-    # Method 1: Basic Thresholding for Text Detection
-    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+def midpoint(x1, y1, x2, y2):
+    """Calculate the midpoint of two points."""
+    return (x1 + x2) // 2, (y1 + y2) // 2
 
-    # Find all connected components (potential text regions)
-    connectivity = 8
-    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary, connectivity, cv2.CV_32S)
 
-    # Filter components by size
-    for i in range(1, num_labels):  # Skip background label 0
-        area = stats[i, cv2.CC_STAT_AREA]
-        if min_area < area < max_area:
-            x = stats[i, cv2.CC_STAT_LEFT]
-            y = stats[i, cv2.CC_STAT_TOP]
-            w = stats[i, cv2.CC_STAT_WIDTH]
-            h = stats[i, cv2.CC_STAT_HEIGHT]
+# Text Removal
+def remove_text(image, pipeline, conf_threshold=60):
+    """Remove text from the image using OCR pipeline."""
+    print("Removing text...")
+    img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-            # Filter by aspect ratio (text usually has specific aspect ratios)
-            aspect_ratio = w / h if h != 0 else 0
-            if 0.2 < aspect_ratio < 15:  # Typical text aspect ratio range
-                cv2.rectangle(mask, (x, y), (x + w, y + h), (255), -1)
+    # Detect text with OCR pipeline
+    prediction_groups = pipeline.recognize([img_rgb])
+    mask = np.zeros(image.shape[:2], dtype="uint8")
 
-    # Method 2: MSER for text region detection
-    mser = cv2.MSER_create(
-        _min_area=100,
-        _max_area=5000,
-        _delta=5,
-        _max_variation=0.5
-    )
+    # Draw mask over detected text
+    for box in prediction_groups[0]:
+        x0, y0 = box[1][0]
+        x1, y1 = box[1][1]
+        x2, y2 = box[1][2]
+        x3, y3 = box[1][3]
+        x_mid0, y_mid0 = midpoint(x1, y1, x2, y2)
+        x_mid1, y_mid1 = midpoint(x0, y0, x3, y3)
+        thickness = int(np.hypot(x2 - x1, y2 - y1))
+        cv2.line(mask, (x_mid0, y_mid0), (x_mid1, y_mid1), 255, thickness)
 
-    # Detect regions
-    regions, _ = mser.detectRegions(gray)
+    # Inpaint image to remove text
+    result = cv2.inpaint(image, mask, 7, cv2.INPAINT_NS)
+    return result
 
-    # Convert regions to rectangles and add to mask
-    for region in regions:
-        x, y, w, h = cv2.boundingRect(region)
-        area = w * h
-        if min_area < area < max_area:
-            aspect_ratio = w / h if h != 0 else 0
-            if 0.2 < aspect_ratio < 15:
-                cv2.rectangle(mask, (x, y), (x + w, y + h), (255), -1)
 
-    # Method 3: Modified Tesseract approach with different configs
-    custom_config = r'--oem 3 --psm 6'  # Assume uniform text on uniform background
-    ocr_results = pytesseract.image_to_data(working_image, output_type=pytesseract.Output.DICT, config=custom_config)
+# Floor Plan Extraction
+def extract_floor_plan(image_path, pipeline, mp=0.1):
+    """Extract the main floor plan by removing text and background."""
+    print("Cropping...")
+    img = cv2.imread(image_path)
+    if img is None:
+        raise ValueError("Image not loaded. Check the file path.")
 
-    for i in range(len(ocr_results['text'])):
-        conf = int(ocr_results['conf'][i])
-        text = ocr_results['text'][i].strip()
+    # Remove text from the image
+    img = remove_text(img, pipeline)
 
-        if conf > conf_threshold and text:
-            x, y, w, h = (ocr_results['left'][i], ocr_results['top'][i],
-                          ocr_results['width'][i], ocr_results['height'][i])
-            area = w * h
-            if min_area < area < max_area:
-                padding = int(min(w, h) * 0.2)
-                x = max(0, x - padding)
-                y = max(0, y - padding)
-                w = min(image.shape[1] - x, w + 2 * padding)
-                h = min(image.shape[0] - y, h + 2 * padding)
-                cv2.rectangle(mask, (x, y), (x + w, y + h), (255), -1)
-
-    # Enhance the mask
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_DILATE, kernel)
-
-    # Debug: Save the mask (optional)
-    # cv2.imwrite("text_mask.jpg", mask)
-
-    # Apply inpainting
-    img_for_inpaint = cv2.bitwise_and(image, image, mask=cv2.bitwise_not(mask))
-    result = cv2.inpaint(img_for_inpaint, mask, 3, cv2.INPAINT_TELEA)
-
-    return result  # Return both result and mask for debugging
-
-def extract_floor_plan(image_path, mp = 0.1):
-    print("cropping...")
-    image = cv2.imread(image_path)
-    cv2.imshow("image before text preprocessing", image)
-    cv2.waitKey(0)
-    #convert to grayscale
-    image = remove_text(image)
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-    cv2.imshow("image after text preprocessing", gray)
-    cv2.waitKey(0)
-
-    #binary thresholding, 70-255 seems to work well
+    # Convert to grayscale and apply thresholding
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     _, binary = cv2.threshold(gray, 70, 255, cv2.THRESH_BINARY_INV)
 
-    # Perform morphological closing to fill small gaps in the outer contour
+    # Perform morphological closing to fill gaps
     height, width = gray.shape
-    kernel = np.ones((int(height*mp), int(width*mp)), np.uint8)
+    kernel = np.ones((int(height * mp), int(width * mp)), np.uint8)
     closed = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
 
-    # Find contours in the closed binary image
+    # Find contours
     contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    # Find the largest contour - usually the floor plan especially after morphology
     main_contour = max(contours, key=cv2.contourArea)
 
-    #fill in the main contour as a mask
+    # Mask and crop the main floor plan
     mask = np.zeros(gray.shape, np.uint8)
     cv2.drawContours(mask, [main_contour], 0, 255, -1)
-
-    # Apply the mask to the original floor plan image
-    result = cv2.bitwise_and(image, image, mask=mask)
-
-    # Get the bounding rectangle of the main contour and crop
+    result = cv2.bitwise_and(img, img, mask=mask)
     x, y, w, h = cv2.boundingRect(main_contour)
     cropped = result[y:y + h, x:x + w]
 
-    cv2.imshow("cropped image", cropped)
-    cv2.waitKey(0)
     return cropped
 
 
-def remove_gaps(image_path, peak_multiplier=0.15, min_size_ratio=0.03, search_ratio=0.05):
-    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-
-    # Check if the image is loaded correctly
-    if image is None:
-        raise ValueError("Image not loaded. Check the file path.")
-
+# Gap Removal
+def remove_gaps(image, min_size=500):
+    """Remove small gaps and extract clean contours."""
     _, binary_image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
     dist_transform = distance_transform_edt(binary_image)
-
-    # Calculate thresholds and peaks
-
-    local_max_large = maximum_filter(dist_transform, size=100)  # Adjust size parameter as needed
-    local_max_small = maximum_filter(dist_transform, size=20)
-    dist_max = dist_transform.max()
-    #peaks_global = dist_transform > dist_max * peak_multiplier
-    peaks = (dist_transform == local_max_large) & (dist_transform == local_max_small) | (dist_transform > peak_multiplier * dist_max)
-    #peaks = peaks_local | peaks_global
-    # Create visualization with threshold line
-    dist_normalized = cv2.normalize(dist_transform, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-
-    dist_rgb = cv2.cvtColor(dist_normalized, cv2.COLOR_GRAY2RGB)
-
-    cv2.imshow('Distance Transform', dist_rgb)
-    cv2.waitKey(0)
-
-    dist_rgb[peaks] = [0, 0, 255]
-    cv2.imshow('Distance Transform with Peaks Identified', dist_rgb)
-    cv2.waitKey(0)
-
+    peaks = dist_transform > (0.1 * dist_transform.max())
     markers = cv2.connectedComponents(np.uint8(peaks))[1]
     inverted_dist_transform = -dist_transform
 
+    # Watershed segmentation
     labels = watershed(inverted_dist_transform, markers, mask=binary_image)
     cleared_labels = clear_border(labels)
-
-    # Remove small components
-    min_size = int((image.shape[0] * image.shape[1]) * (min_size_ratio ** 2))
     final_labels = remove_small_objects(cleared_labels, min_size=min_size)
 
-    # Create a color image to draw the contours
-    contour_image = np.zeros((image.shape[0], image.shape[1], 3), dtype=np.uint8)
+    # Generate contour image
+    contour_image = np.zeros((*image.shape, 3), dtype=np.uint8)
+    unique_labels = np.unique(final_labels[final_labels > 0])
+    colors = generate_color_palette(len(unique_labels))
 
-    # Get unique labels excluding the background (0)
-    unique_labels = np.unique(final_labels)
-    unique_labels = unique_labels[unique_labels > 0]
-
-    # Generate distinct colors for each label
-    colors = np.random.randint(50, 255, size=(len(unique_labels), 3))
-
-    # Draw contours for each unique label
+    # Draw contours
     for i, label in enumerate(unique_labels):
-        # Find contours for the current label
         contours, _ = cv2.findContours((final_labels == label).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        # Draw contours with the corresponding color
         for contour in contours:
-            cv2.drawContours(contour_image, [contour], -1, colors[i].tolist(), 2)
+            cv2.drawContours(contour_image, [contour], -1, colors[i], 2)
 
     return contour_image
 
+
+# Processing Pipeline
+def process_image(image_path, output_dir, pipeline):
+    """Process an image through the full pipeline."""
+    print(f"Processing {image_path}...")
+    cropped = extract_floor_plan(image_path, pipeline)
+    gaps_removed = remove_gaps(cropped)
+
+    # Save outputs
+    os.makedirs(output_dir, exist_ok=True)
+    base_name = os.path.splitext(os.path.basename(image_path))[0]
+    cv2.imwrite(os.path.join(output_dir, f"{base_name}_cropped.png"), cropped)
+    cv2.imwrite(os.path.join(output_dir, f"{base_name}_rooms.png"), gaps_removed)
+
+
 if __name__ == "__main__":
-    path = "MU_2.jpg"
-    image_path = os.path.join("../floorplans", "raw", path)
+    input_dir = "floorplans/raw"
+    output_dir = "floorplans/output"
+    image_paths = [os.path.join(input_dir, path) for path in os.listdir(input_dir) if path.endswith(('.png', '.jpg'))]
 
-    # Check if the image exists
-    if not os.path.exists(image_path):
-        raise FileNotFoundError(f"Image file not found: {image_path}")
+    # Initialise OCR pipeline outside the loop for efficiency
+    pipeline = keras_ocr.pipeline.Pipeline()
 
-    print(f"Processing image: {image_path}")
-    
-    # Process the image
-    try:
-        cropped = extract_floor_plan(image_path)
-        print("cropped: " + path)
-        output_path_cropped = os.path.join("../floorplans", "cropped", path)
-        cv2.imwrite(output_path_cropped, cropped)
+    print("Starting batch processing...")
+    for image_path in tqdm(image_paths, desc="Processing Images"):
+        process_image(image_path, output_dir, pipeline)
 
-        rooms = remove_gaps(output_path_cropped)
-        print("identified: " + path)
-        output_path_rooms = os.path.join("../floorplans", "rooms", path)
-        cv2.imwrite(output_path_rooms, rooms)
-        cv2.imshow("identified rooms", rooms)
-        cv2.waitKey(0)
-    except Exception as e:
-        print(f"Error processing image: {e}")
+    print("Processing completed.")
