@@ -1,38 +1,44 @@
 # 🔑 Last Lock Team 1 - Locked-In
 
-A service optimized for room identification and processing, providing efficient data handling and API integration, automating geospatial data with AI.
----
-
 ## 📝 About
 
-The **Locked-In Backend** serves as the core for processing and identifying room data efficiently. This project is aimed at creating a scalable and reliable backend architecture for handling room-related data.
-
-## 🌟 Goals & Objectives
-
-This project aims to use AI models like Claude 3 Sonnet and GPT-4o to convert SVG and raster images into GeoJSON spatial data via drag-and-drop functionality. This is then further expanded into a frontend utilizing React and Mapbox components. The frontend application should display real-time data on maps, using simulated device inputs to create heat-maps and time-series visualizations, allowing users to explore data over time. The focus is on creating a seamless, efficient interface for automating spatial data conversion while ensuring accurate, detailed mapping.
-
-## Why this Project?
-
-AI models are increasingly powerful and are the future. This project takes advantage of AI to automate a process that is increasingly critical across various industries. Geospatial data and map-based visualizations are growing in popularity across applications like Uber, Zillow, SnapMaps, etc. This project emphasizes the use of AI to automate time-consuming tasks while demonstrating the significance of geospatial data.
+The **Locked-In Backend** serves as the core for processing and identifying room data efficiently. This project is aimed at creating a scalable and reliable backend architecture for handling room-related data. This service is optimized for room identification and processing, providing efficient data handling and API integration, eventually automating geospatial data with AI.
 
 ---
 
 ## ✨ Features
 
+- 🌍 GeoJson Conversion
 - 🏠 Room Identification
 - 🗄️ Database Integration
-- 🚀 Optimised Processes For Faster Execution
+- 🚀 Optimized Processes For Faster Execution
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Programming Language:** Python  
-- **Frameworks/Libraries:** FastAPI, OpenCV  
-- **Database:** MongoDB  
-- **Other Tools:** Cloudinary, Uvicorn, Pytesseract 
+### 💻 Programming Language
+- ![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
 
 ---
+
+### 🧩 Frameworks/Libraries
+- ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+- ![OpenCV](https://img.shields.io/badge/OpenCV-5C3EE8?style=for-the-badge&logo=opencv&logoColor=white)
+- ![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+
+---
+
+### 🗄️ Database
+- ![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
+
+---
+
+### ☁️ Other Tools
+- ![Cloudinary](https://img.shields.io/badge/Cloudinary-3448C5?style=for-the-badge&logo=cloudinary&logoColor=white)
+- ![Uvicorn](https://img.shields.io/badge/Uvicorn-FF69B4?style=for-the-badge)
+- ![PyTesseract](https://img.shields.io/badge/PyTesseract-0C66C2?style=for-the-badge)
+
 
 ## 📦 Dependencies
 
