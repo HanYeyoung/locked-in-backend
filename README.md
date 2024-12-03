@@ -90,8 +90,10 @@ Follow these steps to set up the project locally:
 
 4. **Set Up Environment Variables**: Create a .env file in the root directory and add the following
    ```bash
-   MONGO_URI=your_mongodb_uri
-   CLOUDINARY_URL=your_cloudinary_url
+   MONGO_URI="mongodb+srv://abbaszadeh:sYsoM1slzFqWk1Yd@cluster0.atqjc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+   CLOUDINARY_CLOUD_NAME="drxspo9mq"
+   CLOUDINARY_API_KEY="967515716937372"
+   CLOUDINARY_API_SECRET="LMwMmJu00yJtIbe1REcVpE1qESY"
 
 5. **Run the Server**:
    ```bash
@@ -104,3 +106,5 @@ Follow these steps to set up the project locally:
 ---
 
 ## Authors
+
+Adelia Han, Tina Li, Asish Das, Arian Abbaszadeh, Simarjit Singh Pannu
