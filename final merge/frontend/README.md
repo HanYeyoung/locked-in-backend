@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # LastLockFall2024 - Lock It Like It's Hot - Frontend Capstone Project
 ## React + Vite + Mapbox
 ### Authors: Elijah Gauger, Joe Untrecht, Justin Bildner, Patrick Tuohy, and Shreyas Natarajan
