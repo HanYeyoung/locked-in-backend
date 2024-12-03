@@ -77,32 +77,30 @@ Follow these steps to set up the project locally:
    ```bash
    git clone https://github.com/ArianAbbaszadeh/locked-in-backend.git
    cd locked-in-backend
-   '''
 
 2. **Set Up a Virtual Environment**:
    ```bash
    python -m venv env
    source env/bin/activate  # For MacOS/Linux
    env\Scripts\activate     # For Windows
-   '''
 
 3. **Install Dependencies**:
    ```bash
    pip install -r requirements.txt
-   '''
 
 4. **Set Up Environment Variables**: Create a .env file in the root directory and add the following
    ```bash
    MONGO_URI=your_mongodb_uri
    CLOUDINARY_URL=your_cloudinary_url
-   '''
 
 5. **Run the Server**:
    ```bash
    uvicorn main:app --reload
-   '''
 
 6. **Access the Application**: Open your browser and navigate to:
    ```bash
    http://127.0.0.1:8000
-   '''
+
+---
+
+## Authors
