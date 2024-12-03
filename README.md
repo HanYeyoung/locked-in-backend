@@ -88,12 +88,12 @@ Follow these steps to set up the project locally:
    ```bash
    pip install -r requirements.txt
 
-4. **Set Up Environment Variables**: Create a .env file in the root directory and add the following
+4. **Set Up Environment Variables**: Create a .env file in the root directory and add the following:
    ```bash
-   MONGO_URI="mongodb+srv://abbaszadeh:sYsoM1slzFqWk1Yd@cluster0.atqjc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-   CLOUDINARY_CLOUD_NAME="drxspo9mq"
-   CLOUDINARY_API_KEY="967515716937372"
-   CLOUDINARY_API_SECRET="LMwMmJu00yJtIbe1REcVpE1qESY"
+   MONGO_URI="your_mongodb_uri"
+   CLOUDINARY_CLOUD_NAME="your_cloudinary_name"
+   CLOUDINARY_API_KEY="your_cloudinary_key"
+   CLOUDINARY_API_SECRET="your_cloudinary_secret_key"
 
 5. **Run the Server**:
    ```bash
@@ -105,6 +105,12 @@ Follow these steps to set up the project locally:
 
 ---
 
-## Authors
+## 👥 Contributors
 
-Adelia Han, Tina Li, Asish Das, Arian Abbaszadeh, Simarjit Singh Pannu
+| Name                   | Email                       |
+|------------------------|-----------------------------|
+| **Adelia Han**         | [han293@wisc.edu](mailto:han293@wisc.edu) |
+| **Arian Abbaszadeh**   | [abbaszadeh@wisc.edu](mailto:abbaszadeh@wisc.edu) |
+| **Asish Das**          | [das38@wisc.edu](mailto:das38@wisc.edu) |
+| **Simarjit Singh Pannu** | [pannu2@wisc.edu](mailto:pannu2@wisc.edu) |
+| **Tina Li**            | [tli442@wisc.edu](mailto:tli442@wisc.edu) |
