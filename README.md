@@ -57,3 +57,52 @@ This project relies on the following key dependencies:
 | **scikit-image**     | Advanced image processing and manipulation.               |
 | **PyTesseract**      | Optical character recognition (OCR) capabilities.         |
 | **SciPy**            | Scientific computing and advanced numerical methods.      |
+
+---
+
+## ⚙️ Setup
+
+Follow these steps to set up the project locally:
+
+### Prerequisites
+- Python 3.8 or later installed on your system.
+- MongoDB instance (local or cloud).
+- Cloudinary account for image management.
+
+---
+
+### Installation Steps
+
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/ArianAbbaszadeh/locked-in-backend.git
+   cd locked-in-backend
+   '''
+
+2. **Set Up a Virtual Environment**:
+   ```bash
+   python -m venv env
+   source env/bin/activate  # For MacOS/Linux
+   env\Scripts\activate     # For Windows
+   '''
+
+3. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   '''
+
+4. **Set Up Environment Variables**: Create a .env file in the root directory and add the following
+   ```bash
+   MONGO_URI=your_mongodb_uri
+   CLOUDINARY_URL=your_cloudinary_url
+   '''
+
+5. **Run the Server**:
+   ```bash
+   uvicorn main:app --reload
+   '''
+
+6. **Access the Application**: Open your browser and navigate to:
+   ```bash
+   http://127.0.0.1:8000
+   '''
