@@ -3,18 +3,6 @@
 A backend service optimised for room identification and processing, providing efficient data handling and API integration.
 ---
 
-## 📚 Table of Contents
-- [About](#about)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Installation](#installation)
-- [Usage](#usage)
-- [File Overview](#file-overview)
-- [Contributors](#contributors)
-- [License](#license)
-
----
-
 ## 📝 About
 
 The **Locked-In Backend** serves as the core for processing and identifying room data efficiently. This project is aimed at creating a scalable and reliable backend architecture for handling room-related data.
