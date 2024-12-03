@@ -28,6 +28,6 @@ AI models are increasingly powerful and are the future. This project takes advan
 ## 🛠️ Tech Stack
 
 - **Programming Language:** Python  
-- **Frameworks/Libraries:**   
+- **Frameworks/Libraries:** FastAPI, OpenCV  
 - **Database:** MongoDB  
-- **Other Tools:** 
+- **Other Tools:** Cloudinary, Uvicorn, Pytesseract 
