@@ -31,3 +31,23 @@ AI models are increasingly powerful and are the future. This project takes advan
 - **Frameworks/Libraries:** FastAPI, OpenCV  
 - **Database:** MongoDB  
 - **Other Tools:** Cloudinary, Uvicorn, Pytesseract 
+
+---
+
+## 📦 Dependencies
+
+This project relies on the following key dependencies:
+
+| Dependency           | Purpose                                                   |
+|-----------------------|-----------------------------------------------------------|
+| **FastAPI**          | Framework for building APIs.                              |
+| **Uvicorn**          | ASGI server for running FastAPI applications.             |
+| **python-multipart** | For handling file uploads.                                |
+| **PyMongo**          | MongoDB client for database operations.                   |
+| **Cloudinary**       | Cloud-based image storage and management.                 |
+| **python-dotenv**    | Environment variable management.                          |
+| **OpenCV**           | Image processing and computer vision tasks.              |
+| **NumPy**            | Numerical operations and array handling.                 |
+| **scikit-image**     | Advanced image processing and manipulation.               |
+| **PyTesseract**      | Optical character recognition (OCR) capabilities.         |
+| **SciPy**            | Scientific computing and advanced numerical methods.      |
